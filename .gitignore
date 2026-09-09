@@ -1,0 +1,10 @@
+# Measurement data - written by the notebooks, too big to share
+output/
+
+# Local Claude Code settings
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
