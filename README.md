@@ -1,27 +1,31 @@
 # ZCU216 full duplex bench
 
-Four notebooks that drive a ZCU216 with an XM655 balun card: transmit a tone out of a
+Six notebooks that drive a ZCU216 with an XM655 balun card: transmit a tone out of a
 beamforming array, capture it on 16 receivers, measure the channels between two systems,
 and cancel a system's own transmission out of its own ears.
 
 ```
                        config/parameters.json
                                  |
-        +------------------------+------------------------+
-        |                        |                        |
-        v                        v                        v
- capture_and_record   calibration_algo_measurments   channel_estimation
-   plots only               output/captures/           output/channels/
-  (is the board alive?)     (beam weight sweeps)     h00 h01 h10 h11 + params
-                                                              |
-                                                              v
-                                                       one_side_fd_sic
-                                                          output/sic/
-                                                   results.md + signals
+        +---------------+---------------+---------------------+
+        |               |               |                     |
+        v               v               v                     v
+ capture_and_record  calibration_  channel_estimation    no_channel_sic
+   plots only        algo_measur.   output/channels/    output/no_channel_sic/
+  (board alive?)   output/captures/ h00 h01 h10 h11      trains itself on
+                   (weight sweeps)        |              solo captures
+                                          v
+                                +---------+---------+
+                                |                   |
+                                v                   v
+                         one_side_fd_sic     two_side_fd_sic
+                            output/sic/      output/two_side_sic/
+                        results.md + signals  results.md + signals
 ```
 
-`channel_estimation` must run before `one_side_fd_sic`, which designs its beamformer on
-the matrices the estimation left in `output/channels/`. The other two are independent.
+`channel_estimation` must run before `one_side_fd_sic` and `two_side_fd_sic` - both
+design their beamformers on the matrices the estimation left in `output/channels/`.
+`no_channel_sic` needs no estimate: it probes the board itself. The rest are independent.
 
 ## About the ZCU216
 
@@ -69,8 +73,10 @@ and adds only what is specific to its own experiment.
 | `rf.adc_zone` | receive Nyquist zone, 2 because the fold is even | the fold is mixed to the wrong side and the tone disappears |
 | `capture.n_cap` | samples per channel in one capture | must be a power of two; it sets the FFT bin grid the tone is snapped to |
 | `capture.trig_hold_s` | how long `trig_cap` stays high | too short and the DAC stops playing mid capture, leaving the tail silent |
-| `signal.tone_mhz` | baseband CW tone, offset down from the tile NCO | snapped onto the nearest FFT bin at run time, so a value between bins is corrected, not rejected |
+| `signal.tone_0_mhz` | baseband CW tone system 0 transmits, offset down from the tile NCO | snapped onto the nearest FFT bin at run time, so a value between bins is corrected, not rejected |
+| `signal.tone_1_mhz` | baseband CW tone system 1 transmits - only the SIC notebooks read it | must land on a different FFT bin than `tone_0_mhz`, or the leakage and the link cannot be told apart |
 | `signal.amp` | DAC drive, 16383 for the 14 bit full scale | above 16383 the samples wrap and the tone is no longer a tone |
+| `bsic.regularization` | stage 2 lambda of `no_channel_sic`, added to the self interference covariance, in ADC counts squared | too small and the receive weight chases noise in the near singular covariance; too large and it stops nulling and only chases the link |
 | `systems.dacs_0` | system 0's transmit elements, `overlay.dac[]` indices | weights go to DACs that are not wired to the antennas, and the capture is only crosstalk - it still looks like a signal, but the phase is noise |
 | `systems.adcs_0` | system 0's own receivers - the near field | the self interference matrix `H00` describes the wrong ears |
 | `systems.dacs_1` | system 1's transmit elements | `H01` is measured from the wrong node |
@@ -88,16 +94,21 @@ Run each notebook top to bottom. Only one kernel at a time may hold the overlay.
 | `capture_and_record.ipynb` | transmit a tone or a chirp, capture all 16 ADCs, plot IQ and spectrum | nothing - it is the smoke test |
 | `calibration_algo_measurments.ipynb` | sweep a table of beam weights, saving far and near field captures separately, and check trigger repeatability | `output/captures/` |
 | `channel_estimation.ipynb` | excite every element of both systems, one-hot or Hadamard, and cut out the four channel matrices `H00 H01 H10 H11` | `output/channels/` |
-| `one_side_fd_sic.ipynb` | design BSIC on the stored channels, run BSIC and DSIC over five aligned captures, and measure the cancellation depth | `output/sic/` |
+| `one_side_fd_sic.ipynb` | only system 0 cancels, system 1 just transmits a second tone - depth, link preservation, SIR and far field reach over six aligned captures | `output/sic/` |
+| `two_side_fd_sic.ipynb` | both sides cancelling at once, each on its own tone - depth, link preservation and SIR per side, over eight aligned captures | `output/two_side_sic/` |
+| `no_channel_sic.ipynb` | two stage BSIC with no channel estimate: probe each side one DAC at a time, transmit down the quietest direction, then train the receive weights on solo captures | `output/no_channel_sic/` |
 
 ## Layout
 
 ```
-config/parameters.json   the settings all four executables share
+config/parameters.json   the settings every executable shares
 lib/
   config_parser.py       reads that file
   common_functions.py    arming a burst, raw -> IQ, tone generation, file chores
   mts/                   the board driver, the bitstream and its metadata
-  fd/                    the BSIC and DSIC algorithms
+  fd/
+    non_joint_sic_bsic.py  beamforming cancellation, one side at a time
+    joint_sic_bsic.py      beamforming cancellation, both sides together
+    dsic.py                digital cancellation
 output/                  captures, channels and cancellation runs
 ```

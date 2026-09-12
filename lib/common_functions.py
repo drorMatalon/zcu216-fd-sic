@@ -71,6 +71,21 @@ def write_tone_to_players(overlay, tone):
     for player in players:
         overlay.dac_data_mem_write(overlay.signal, player)
 
+def write_tone_to_tile_player(overlay, tone, tile):
+    """Write one waveform into one tile's player, for a different tone per tile.
+
+    All four DACs of a tile read that player, so this is the finest the waveform
+    can be split - anything per element is the gain and phase table's job.
+    """
+    players = [overlay.dac0_player, overlay.dac1_player,
+               overlay.dac2_player, overlay.dac3_player]
+    if tile not in range(len(players)):
+        raise ValueError("tile must be 0..%d, got %d" % (len(players) - 1, tile))
+    samples = np.zeros(2 * len(tone), dtype=np.int16)
+    samples[0::2] = np.int16(tone.real)
+    samples[1::2] = np.int16(tone.imag)
+    overlay.dac_data_mem_write(samples, players[tile])
+
 def snap_tone_to_fft_bin(tone_mhz, adc_sr, n_cap):
     """Return the tone moved onto an exact FFT bin of the capture window.
 

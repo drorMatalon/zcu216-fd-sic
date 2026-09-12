@@ -16,8 +16,12 @@
     "trig_hold_s": 0.01
   },
   "signal": {
-    "tone_mhz": 5,
+    "tone_0_mhz": 5,
+    "tone_1_mhz": 5.5,
     "amp": 16383
+  },
+  "bsic": {
+    "regularization": 1e-3
   },
   "systems": {
     "dacs_0": [8, 9, 10, 11],
