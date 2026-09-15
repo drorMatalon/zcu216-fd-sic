@@ -63,6 +63,7 @@ and adds only what is specific to its own experiment.
 
 | key | what it is | if it is wrong |
 |---|---|---|
+| `test_mode` | run against `lib/mts/dummy_zcy216_overlay.py`, a software board, instead of the ZCU216 | `true` on the board wastes a session measuring a made up channel; `false` on a laptop fails on the pynq import |
 | `board.n_ch` | RF channels on the XM655, 16 | the capture is de-interleaved into the wrong number of lanes and every channel is garbage |
 | `board.n_tile` | ADC and DAC tiles, 4 | the per-tile validators stop catching a short NCO table |
 | `board.dac_sr` | DAC baseband rate, 1e9 Hz | the transmitted tone is not at the frequency you asked for |
@@ -97,6 +98,11 @@ Run each notebook top to bottom. Only one kernel at a time may hold the overlay.
 | `one_side_fd_sic.ipynb` | only system 0 cancels, system 1 just transmits a second tone - depth, link preservation, SIR and far field reach over six aligned captures | `output/sic/` |
 | `two_side_fd_sic.ipynb` | both sides cancelling at once, each on its own tone - depth, link preservation and SIR per side, over eight aligned captures | `output/two_side_sic/` |
 | `no_channel_sic.ipynb` | two stage BSIC with no channel estimate: probe each side one DAC at a time, transmit down the quietest direction, then train the receive weights on solo captures | `output/no_channel_sic/` |
+
+Every notebook picks its board from `test_mode`: the dummy overlay answers the same
+calls as `doaMtsOverlay` and puts each capture through one fixed, symmetric 16 by 16
+channel matrix, so the notebooks can be run end to end with no hardware. Nothing else
+in a notebook changes between the two.
 
 ## Layout
 

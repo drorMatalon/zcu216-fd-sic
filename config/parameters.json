@@ -1,4 +1,6 @@
 {
+  "test_mode": false,
+
   "board": {
     "n_ch": 16,
     "n_tile": 4,
